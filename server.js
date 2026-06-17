@@ -28,19 +28,32 @@ wss.on("connection", (ws) => {
 
 app.post("/lead", (req, res) => {
   try {
-    const lead = req.body;
+    console.log("RAW BODY:", req.body);
 
-    const payload = JSON.stringify({
+    // handle both cases: JSON OR string
+    let lead = req.body;
+
+    if (typeof lead === "string") {
+      try {
+        lead = JSON.parse(lead);
+      } catch (e) {
+        console.log("Failed to parse string body");
+      }
+    }
+
+    const payload = {
       title: "New Lead",
-      name: lead.name,
-      campus: lead.campus,
-      owner: lead.owner,
-      leadId: lead.leadId
-    });
+      name: lead.name || lead.Full_Name || "Unknown",
+      campus: lead.campus || lead.Campus || "Unknown",
+      owner: lead.owner || "Unknown",
+      leadId: lead.leadId || "Unknown"
+    };
+
+    console.log("FINAL PAYLOAD:", payload);
 
     clients.forEach(ws => {
       if (ws.readyState === 1) {
-        ws.send(payload);
+        ws.send(JSON.stringify(payload));
       }
     });
 
