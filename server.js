@@ -30,11 +30,6 @@ wss.on("connection", (ws, req) => {
   const connectedAt = Date.now();
   console.log("Client connected:", email);
 
-  ws.isAlive = true;
-  ws.on("pong", () => {
-    ws.isAlive = true;
-  });
-
   if (!clientsByEmail.has(email)) {
     clientsByEmail.set(email, new Set());
   }
@@ -51,20 +46,6 @@ wss.on("connection", (ws, req) => {
     }
   });
 });
-
-// detect and drop zombie connections (network dropped without a clean close)
-const heartbeatInterval = setInterval(() => {
-  wss.clients.forEach(ws => {
-    if (ws.isAlive === false) {
-      console.log("Terminating unresponsive connection");
-      return ws.terminate();
-    }
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-
-wss.on("close", () => clearInterval(heartbeatInterval));
 
 app.post("/lead", (req, res) => {
   try {
