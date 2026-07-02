@@ -70,7 +70,7 @@ async function connect() {
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "ping" }));
       }
-    }, 20000);
+    }, 10000);
   };
 
   socket.onmessage = (event) => {
