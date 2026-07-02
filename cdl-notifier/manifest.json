@@ -17,9 +17,8 @@
       "default_icon": "icon.png"
     },
     "host_permissions": [
-      "https://cdl-realtime-server.onrender.com/*",
+      "https://*.onrender.com/*",
       "https://crm.zoho.com/*",
-      "http://localhost:3000/*",
-      "https://avid-wreckage-overrate.ngrok-free.dev/*"
+      "http://localhost:3000/*"
     ]
   }

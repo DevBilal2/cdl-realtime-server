@@ -1,22 +1,22 @@
-const SERVER_URL = "wss://cdl-realtime-server.onrender.com";
+const DEFAULT_SERVER_URL = "wss://cdl-realtime-server-vuw5.onrender.com";
 
 let socket = null;
 let reconnectTimer = null;
 
-async function getMyEmail() {
-  const { myEmail } = await chrome.storage.local.get("myEmail");
-  return myEmail || null;
+async function getConfig() {
+  const { myEmail, serverUrl } = await chrome.storage.local.get(["myEmail", "serverUrl"]);
+  return { myEmail: myEmail || null, serverUrl: serverUrl || DEFAULT_SERVER_URL };
 }
 
 async function connect() {
-  const myEmail = await getMyEmail();
+  const { myEmail, serverUrl } = await getConfig();
 
   if (!myEmail) {
     console.log("No email configured yet, not connecting. Open extension options to set it.");
     return;
   }
 
-  socket = new WebSocket(`${SERVER_URL}?email=${encodeURIComponent(myEmail)}`);
+  socket = new WebSocket(`${serverUrl}?email=${encodeURIComponent(myEmail)}`);
 
   socket.onopen = () => {
     console.log("Connected to realtime server as", myEmail);
