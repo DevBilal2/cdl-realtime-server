@@ -1,0 +1,25 @@
+{
+    "manifest_version": 3,
+    "name": "CDL Lead Notifier",
+    "version": "1.0",
+    "permissions": [
+      "notifications",
+      "alarms",
+      "offscreen",
+      "storage",
+      "tabs"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_popup": "options.html",
+      "default_icon": "icon.png"
+    },
+    "host_permissions": [
+      "https://cdl-realtime-server.onrender.com/*",
+      "https://crm.zoho.com/*",
+      "http://localhost:3000/*",
+      "https://avid-wreckage-overrate.ngrok-free.dev/*"
+    ]
+  }

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CDL Lead Notifier Settings</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 20px;
+        width: 320px;
+      }
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+      }
+      button {
+        padding: 6px 14px;
+      }
+      #status {
+        margin-top: 10px;
+        font-size: 13px;
+        color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <label for="email">Your Zoho CRM email</label>
+    <input type="email" id="email" placeholder="you@cdl-cda.com" />
+    <button id="save">Save</button>
+    <div id="status"></div>
+    <script src="options.js"></script>
+  </body>
+</html>
