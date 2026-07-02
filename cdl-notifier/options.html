@@ -3,40 +3,313 @@
   <head>
     <meta charset="utf-8" />
     <title>CDL Lead Notifier Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      body {
-        font-family: system-ui, sans-serif;
-        padding: 20px;
-        width: 320px;
+      * {
+        box-sizing: border-box;
       }
-      label {
-        display: block;
-        margin-bottom: 6px;
+      body {
+        margin: 0;
+        width: 360px;
+        font-family: "IBM Plex Sans", sans-serif;
+        color: oklch(0.22 0.015 70);
+      }
+
+      .stripe {
+        display: flex;
+        height: 4px;
+      }
+      .stripe div {
+        flex: 1;
+      }
+      .stripe .c1 {
+        background: #e42527;
+      }
+      .stripe .c2 {
+        background: #f9b21d;
+      }
+      .stripe .c3 {
+        background: #089949;
+      }
+      .stripe .c4 {
+        background: #226db4;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 14px 16px;
+        background: #fdecec;
+        border-bottom: 1px solid oklch(0.85 0.015 70);
+      }
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        min-width: 0;
+      }
+      .brand .cdl {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+      }
+      .brand .sub {
+        font-size: 13px;
+        font-weight: 500;
+        color: oklch(0.4 0.02 70);
+        white-space: nowrap;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .status .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: #a8a8a8;
+      }
+      .status .label {
+        font-size: 11px;
+        font-weight: 500;
+        color: oklch(0.4 0.02 70);
+        white-space: nowrap;
+      }
+
+      .body {
+        padding: 18px 16px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .desc {
+        font-size: 12px;
+        line-height: 1.5;
+        color: oklch(0.46 0.015 70);
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .field label {
+        font-size: 11px;
+        font-weight: 600;
+        color: oklch(0.35 0.02 70);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .field input {
+        width: 100%;
+        padding: 10px 11px;
+        border-radius: 4px;
+        border: 1.5px solid oklch(0.78 0.015 70);
+        background: white;
+        font-size: 13.5px;
+        font-family: "IBM Plex Sans", sans-serif;
+        color: oklch(0.22 0.015 70);
+        outline: none;
+        transition: border-color 0.1s, box-shadow 0.1s;
+      }
+      .field input:focus {
+        border-color: #e42527;
+        box-shadow: 0 0 0 3px rgba(228, 37, 39, 0.12);
+      }
+
+      .advanced-toggle {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        user-select: none;
+        padding: 2px 0;
+      }
+      .advanced-toggle .chevron {
+        font-size: 10px;
+        color: #e42527;
+        transition: transform 0.15s ease;
+        flex-shrink: 0;
+        display: inline-block;
+      }
+      .advanced-toggle.open .chevron {
+        transform: rotate(90deg);
+      }
+      .advanced-toggle .label {
+        font-size: 11px;
+        font-weight: 600;
+        color: oklch(0.4 0.02 70);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .advanced-body {
+        display: none;
+        flex-direction: column;
+        gap: 5px;
+        padding: 10px 0 2px 14px;
+        border-left: 2px solid #fdecec;
+        margin-left: 2px;
+        margin-top: 6px;
+      }
+      .advanced-body.open {
+        display: flex;
+      }
+      .advanced-body label {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: oklch(0.4 0.02 70);
+      }
+      .advanced-body input {
+        width: 100%;
+        padding: 8px 9px;
+        border-radius: 4px;
+        border: 1.5px solid oklch(0.78 0.015 70);
+        background: oklch(0.98 0.008 70);
+        font-size: 11.5px;
+        font-family: "IBM Plex Mono", monospace;
+        color: oklch(0.35 0.015 70);
+        outline: none;
+        transition: border-color 0.1s, box-shadow 0.1s;
+      }
+      .advanced-body input:focus {
+        border-color: #e42527;
+        box-shadow: 0 0 0 3px rgba(228, 37, 39, 0.12);
+      }
+      .advanced-hint {
+        font-size: 10.5px;
+        color: oklch(0.58 0.015 70);
+        line-height: 1.4;
+      }
+
+      .save-btn {
+        width: 100%;
+        padding: 11px;
+        border: none;
+        border-radius: 4px;
+        background: #e42527;
+        color: white;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13.5px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 0.01em;
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+      }
+      .save-btn:hover {
+        background: #c81f21;
+      }
+      .save-btn:active {
+        box-shadow: none;
+        transform: translateY(1px);
+      }
+
+      .status-msg {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 10px;
+        border-radius: 4px;
+      }
+      .status-msg.show {
+        display: flex;
+      }
+      .status-msg .icon {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .status-msg .msg {
+        font-size: 12px;
+        line-height: 1.4;
         font-weight: 600;
       }
-      input {
-        width: 100%;
-        padding: 6px;
-        box-sizing: border-box;
-        margin-bottom: 10px;
+      .status-msg.success {
+        background: #eaf6ee;
       }
-      button {
-        padding: 6px 14px;
+      .status-msg.success .icon {
+        background: #089949;
       }
-      #status {
-        margin-top: 10px;
-        font-size: 13px;
-        color: green;
+      .status-msg.success .msg {
+        color: #089949;
+      }
+      .status-msg.error {
+        background: #fdecec;
+      }
+      .status-msg.error .icon {
+        background: #e42527;
+      }
+      .status-msg.error .msg {
+        color: #e42527;
       }
     </style>
   </head>
   <body>
-    <label for="email">Your Zoho CRM email</label>
-    <input type="email" id="email" placeholder="you@cdl-cda.com" />
-    <label for="serverUrl">Server URL</label>
-    <input type="text" id="serverUrl" placeholder="wss://cdl-realtime-server.onrender.com" />
-    <button id="save">Save</button>
-    <div id="status"></div>
+    <div class="stripe">
+      <div class="c1"></div>
+      <div class="c2"></div>
+      <div class="c3"></div>
+      <div class="c4"></div>
+    </div>
+
+    <div class="header">
+      <div class="brand">
+        <span class="cdl">CDL</span>
+        <span class="sub">Lead Notifier</span>
+      </div>
+      <div class="status">
+        <span class="dot" id="statusDot"></span>
+        <span class="label" id="statusLabel">Not connected</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="desc">
+        One-time setup. Leads route to you by this email, no live feed here, just the notification when one lands.
+      </div>
+
+      <div class="field">
+        <label for="email">Your Zoho CRM email</label>
+        <input type="text" id="email" placeholder="you@cdl-cda.com" />
+      </div>
+
+      <div>
+        <div class="advanced-toggle" id="advancedToggle">
+          <span class="chevron">&#9656;</span>
+          <span class="label">Advanced</span>
+        </div>
+        <div class="advanced-body" id="advancedBody">
+          <label for="serverUrl">Server URL</label>
+          <input type="text" id="serverUrl" placeholder="wss://cdl-realtime-server.onrender.com" />
+          <div class="advanced-hint">Most recruiters won't need to change this.</div>
+        </div>
+      </div>
+
+      <button class="save-btn" id="saveBtn">Save</button>
+
+      <div class="status-msg" id="statusMsg">
+        <span class="icon" id="statusIcon"></span>
+        <span class="msg" id="statusText"></span>
+      </div>
+    </div>
+
     <script src="options.js"></script>
   </body>
 </html>

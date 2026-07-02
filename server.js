@@ -27,6 +27,7 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
+  const connectedAt = Date.now();
   console.log("Client connected:", email);
 
   if (!clientsByEmail.has(email)) {
@@ -35,6 +36,7 @@ wss.on("connection", (ws, req) => {
   clientsByEmail.get(email).add(ws);
 
   ws.on("close", () => {
+    console.log("Client disconnected:", email, "after", Math.round((Date.now() - connectedAt) / 1000) + "s");
     const sockets = clientsByEmail.get(email);
     if (sockets) {
       sockets.delete(ws);

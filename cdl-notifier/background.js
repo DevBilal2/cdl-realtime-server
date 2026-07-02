@@ -8,6 +8,22 @@ async function getConfig() {
   return { myEmail: myEmail || null, serverUrl: serverUrl || DEFAULT_SERVER_URL };
 }
 
+function getConnectionState() {
+  if (!socket) return "disconnected";
+  switch (socket.readyState) {
+    case WebSocket.CONNECTING:
+      return "connecting";
+    case WebSocket.OPEN:
+      return "connected";
+    default:
+      return "disconnected";
+  }
+}
+
+function broadcastStatus(status) {
+  chrome.runtime.sendMessage({ type: "STATUS_UPDATE", status }).catch(() => {});
+}
+
 async function connect() {
   const { myEmail, serverUrl } = await getConfig();
 
@@ -16,10 +32,17 @@ async function connect() {
     return;
   }
 
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    console.log("Already connected/connecting, skipping duplicate connect()");
+    return;
+  }
+
   socket = new WebSocket(`${serverUrl}?email=${encodeURIComponent(myEmail)}`);
+  broadcastStatus("connecting");
 
   socket.onopen = () => {
     console.log("Connected to realtime server as", myEmail);
+    broadcastStatus("connected");
   };
 
   socket.onmessage = (event) => {
@@ -57,6 +80,7 @@ async function connect() {
 
   socket.onclose = () => {
     console.log("WebSocket disconnected, retrying in 5s");
+    broadcastStatus("disconnected");
     scheduleReconnect();
   };
 }
@@ -106,12 +130,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "EMAIL_UPDATED") {
     if (socket) {
       socket.close();
     }
     connect();
+  }
+  if (msg.type === "GET_STATUS") {
+    sendResponse({ status: getConnectionState() });
   }
 });
 
