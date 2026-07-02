@@ -14,15 +14,34 @@ const server = http.createServer(app);
 
 const wss = new WebSocketServer({ server });
 
-let clients = [];
+// email -> Set<ws>, supports multiple tabs/windows per recruiter
+const clientsByEmail = new Map();
 
-wss.on("connection", (ws) => {
-  console.log("Client connected");
+wss.on("connection", (ws, req) => {
+  const { searchParams } = new URL(req.url, "http://localhost");
+  const email = (searchParams.get("email") || "").toLowerCase().trim();
 
-  clients.push(ws);
+  if (!email) {
+    console.log("Client connected without email, closing");
+    ws.close();
+    return;
+  }
+
+  console.log("Client connected:", email);
+
+  if (!clientsByEmail.has(email)) {
+    clientsByEmail.set(email, new Set());
+  }
+  clientsByEmail.get(email).add(ws);
 
   ws.on("close", () => {
-    clients = clients.filter(c => c !== ws);
+    const sockets = clientsByEmail.get(email);
+    if (sockets) {
+      sockets.delete(ws);
+      if (sockets.size === 0) {
+        clientsByEmail.delete(email);
+      }
+    }
   });
 });
 
@@ -51,11 +70,18 @@ app.post("/lead", (req, res) => {
 
     console.log("FINAL PAYLOAD:", payload);
 
-    clients.forEach(ws => {
-      if (ws.readyState === 1) {
-        ws.send(JSON.stringify(payload));
-      }
-    });
+    const ownerEmail = String(payload.owner).toLowerCase().trim();
+    const sockets = clientsByEmail.get(ownerEmail);
+
+    if (sockets) {
+      sockets.forEach(ws => {
+        if (ws.readyState === 1) {
+          ws.send(JSON.stringify(payload));
+        }
+      });
+    } else {
+      console.log("No connected client for owner:", ownerEmail);
+    }
 
     res.json({ status: "ok" });
 
