@@ -57,10 +57,20 @@ async function connect() {
 
   broadcastStatus("connecting");
 
+  let pingInterval = null;
+
   socket.onopen = () => {
     console.log("Connected to realtime server as", myEmail);
     isConnecting = false;
     broadcastStatus("connected");
+
+    // keep traffic flowing so proxies (Render/Cloudflare) don't treat the
+    // connection as idle and close it
+    pingInterval = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "ping" }));
+      }
+    }, 20000);
   };
 
   socket.onmessage = (event) => {
@@ -99,6 +109,9 @@ async function connect() {
   socket.onclose = () => {
     console.log("WebSocket disconnected, retrying in 5s");
     isConnecting = false;
+    if (pingInterval) {
+      clearInterval(pingInterval);
+    }
     broadcastStatus("disconnected");
     scheduleReconnect();
   };

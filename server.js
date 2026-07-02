@@ -35,6 +35,10 @@ wss.on("connection", (ws, req) => {
   }
   clientsByEmail.get(email).add(ws);
 
+  ws.on("message", () => {
+    // client-side keepalive pings, nothing to do
+  });
+
   ws.on("close", () => {
     console.log("Client disconnected:", email, "after", Math.round((Date.now() - connectedAt) / 1000) + "s");
     const sockets = clientsByEmail.get(email);
