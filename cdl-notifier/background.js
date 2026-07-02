@@ -2,6 +2,7 @@ const DEFAULT_SERVER_URL = "wss://cdl-realtime-server-vuw5.onrender.com";
 
 let socket = null;
 let reconnectTimer = null;
+let isConnecting = false;
 
 async function getConfig() {
   const { myEmail, serverUrl } = await chrome.storage.local.get(["myEmail", "serverUrl"]);
@@ -25,23 +26,40 @@ function broadcastStatus(status) {
 }
 
 async function connect() {
-  const { myEmail, serverUrl } = await getConfig();
+  if (isConnecting || (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING))) {
+    console.log("Already connecting/connected, skipping duplicate connect()");
+    return;
+  }
+  isConnecting = true;
+
+  let myEmail, serverUrl;
+  try {
+    ({ myEmail, serverUrl } = await getConfig());
+  } catch (e) {
+    isConnecting = false;
+    throw e;
+  }
 
   if (!myEmail) {
     console.log("No email configured yet, not connecting. Open extension options to set it.");
+    isConnecting = false;
     return;
   }
 
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-    console.log("Already connected/connecting, skipping duplicate connect()");
+  try {
+    socket = new WebSocket(`${serverUrl}?email=${encodeURIComponent(myEmail)}`);
+  } catch (e) {
+    console.error("Failed to open WebSocket:", e.message);
+    isConnecting = false;
+    scheduleReconnect();
     return;
   }
 
-  socket = new WebSocket(`${serverUrl}?email=${encodeURIComponent(myEmail)}`);
   broadcastStatus("connecting");
 
   socket.onopen = () => {
     console.log("Connected to realtime server as", myEmail);
+    isConnecting = false;
     broadcastStatus("connected");
   };
 
@@ -80,6 +98,7 @@ async function connect() {
 
   socket.onclose = () => {
     console.log("WebSocket disconnected, retrying in 5s");
+    isConnecting = false;
     broadcastStatus("disconnected");
     scheduleReconnect();
   };
