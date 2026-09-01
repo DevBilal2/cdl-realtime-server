@@ -97,9 +97,9 @@ app.post("/lead", (req, res) => {
     }
   }
 
-  if (delivered === 0) {
-    console.log("No connected client for owner:", owner);
-  }
+  // the lead's name is customer PII and stays out of the logs; owner and
+  // leadId are what you need to trace whether a lead actually landed
+  console.log("Lead", leadId, "->", owner, ": delivered to", delivered, "client(s)");
 
   res.json({ status: "ok", delivered });
 });
