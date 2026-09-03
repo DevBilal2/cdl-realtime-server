@@ -24,15 +24,65 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", connected: clientsByEmail.size });
 });
 
-// token -> email. The client presents a token and the server decides which
-// address it maps to, so a recruiter can't read someone else's leads by
-// typing their address, and a typo fails immediately instead of silently
-// connecting as an address that never receives anything.
-const RECRUITER_TOKENS = JSON.parse(process.env.RECRUITER_TOKENS || "{}");
-if (Object.keys(RECRUITER_TOKENS).length === 0) {
-  console.error("RECRUITER_TOKENS is not set, refusing to start");
+// Access codes are derived from the email, so there is no code-to-person
+// mapping for anyone to maintain or get out of sync. Changing TOKEN_SECRET
+// invalidates every code at once, which is the panic button.
+//
+// hex, lowercase, first 24 chars: Deluge's zoho.encryption.hmacsha256 emits
+// hex, and both sides must produce byte-identical codes.
+const TOKEN_SECRET = process.env.TOKEN_SECRET;
+if (!TOKEN_SECRET) {
+  console.error("TOKEN_SECRET is not set, refusing to start");
   process.exit(1);
 }
+
+function codeFor(email) {
+  return crypto.createHmac("sha256", TOKEN_SECRET)
+    .update(email.toLowerCase().trim())
+    .digest("hex")
+    .slice(0, 24);
+}
+
+// token -> email. The client presents a code and the server decides which
+// address it maps to, so a recruiter can't read someone else's leads by
+// claiming their address, and a mistyped code fails immediately instead of
+// connecting as an address that never receives anything.
+let recruiterTokens = {};
+
+function setRoster(emails) {
+  const map = {};
+  let skipped = 0;
+
+  for (const raw of emails) {
+    const email = String(raw || "").toLowerCase().trim();
+    if (!email.includes("@")) {
+      skipped++;
+      continue;
+    }
+    map[codeFor(email)] = email;
+  }
+
+  recruiterTokens = map;
+
+  // someone taken off the roster should lose their connection now, not
+  // whenever they next happen to reconnect
+  const active = new Set(Object.values(map));
+  for (const [email, sockets] of clientsByEmail) {
+    if (!active.has(email)) {
+      console.log("Disconnecting, no longer on roster:", email);
+      for (const ws of sockets) {
+        ws.close(1008, "no longer on roster");
+      }
+    }
+  }
+
+  return { count: Object.keys(map).length, skipped };
+}
+
+// Split on commas, semicolons or whitespace so the list survives however it
+// gets pasted in. This is only a fallback for the window between a restart and
+// Zoho's next roster push; Zoho is the source of truth.
+const seedEmails = (process.env.RECRUITERS || "").split(/[\s,;]+/).filter(Boolean);
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
@@ -40,11 +90,21 @@ const wss = new WebSocketServer({ noServer: true });
 // email -> Set<ws>, supports multiple tabs/windows per recruiter
 const clientsByEmail = new Map();
 
+{
+  const { count, skipped } = setRoster(seedEmails);
+  if (count === 0) {
+    // safe but not useful: nobody can connect until Zoho pushes the roster
+    console.warn("Roster is empty at boot, waiting for Zoho to push it");
+  } else {
+    console.log("Roster seeded from RECRUITERS:", count, "recruiter(s),", skipped, "skipped");
+  }
+}
+
 // Authenticate during the upgrade so an unauthorized client never completes
 // the handshake.
 server.on("upgrade", (req, socket, head) => {
   const { searchParams } = new URL(req.url, "http://localhost");
-  const email = (RECRUITER_TOKENS[searchParams.get("token")] || "").toLowerCase().trim();
+  const email = (recruiterTokens[searchParams.get("token")] || "").toLowerCase().trim();
 
   if (!email) {
     console.log("Rejected websocket upgrade: bad or missing token");
@@ -101,6 +161,26 @@ const heartbeat = setInterval(() => {
   }
 }, 30000);
 wss.on("close", () => clearInterval(heartbeat));
+
+app.post("/roster", (req, res) => {
+  if (!safeEqual(req.get("x-api-key") || "", LEAD_API_KEY)) {
+    console.log("Rejected /roster: bad or missing API key");
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const emails = Array.isArray(req.body && req.body.emails) ? req.body.emails : null;
+
+  // an empty push would disconnect everyone and lock the whole team out, which
+  // is far more likely to be a broken Zoho function than a real empty roster
+  if (!emails || emails.length === 0) {
+    console.log("Rejected /roster: emails must be a non-empty array");
+    return res.status(400).json({ error: "emails must be a non-empty array" });
+  }
+
+  const { count, skipped } = setRoster(emails);
+  console.log("Roster updated from Zoho:", count, "recruiter(s),", skipped, "skipped");
+  res.json({ status: "ok", recruiters: count, skipped });
+});
 
 app.post("/lead", (req, res) => {
   if (!safeEqual(req.get("x-api-key") || "", LEAD_API_KEY)) {
