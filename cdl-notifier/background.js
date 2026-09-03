@@ -3,10 +3,11 @@ const DEFAULT_SERVER_URL = "wss://cdl-realtime-server-vuw5.onrender.com";
 let socket = null;
 let reconnectTimer = null;
 let isConnecting = false;
+let reconnectAttempts = 0;
 
 async function getConfig() {
-  const { myEmail, serverUrl } = await chrome.storage.local.get(["myEmail", "serverUrl"]);
-  return { myEmail: myEmail || null, serverUrl: serverUrl || DEFAULT_SERVER_URL };
+  const { myToken, serverUrl } = await chrome.storage.local.get(["myToken", "serverUrl"]);
+  return { myToken: myToken || null, serverUrl: serverUrl || DEFAULT_SERVER_URL };
 }
 
 function getConnectionState() {
@@ -32,22 +33,22 @@ async function connect() {
   }
   isConnecting = true;
 
-  let myEmail, serverUrl;
+  let myToken, serverUrl;
   try {
-    ({ myEmail, serverUrl } = await getConfig());
+    ({ myToken, serverUrl } = await getConfig());
   } catch (e) {
     isConnecting = false;
     throw e;
   }
 
-  if (!myEmail) {
-    console.log("No email configured yet, not connecting. Open extension options to set it.");
+  if (!myToken) {
+    console.log("No access code set, not connecting. Open the extension popup to paste it.");
     isConnecting = false;
     return;
   }
 
   try {
-    socket = new WebSocket(`${serverUrl}?email=${encodeURIComponent(myEmail)}`);
+    socket = new WebSocket(`${serverUrl}?token=${encodeURIComponent(myToken)}`);
   } catch (e) {
     console.error("Failed to open WebSocket:", e.message);
     isConnecting = false;
@@ -60,8 +61,9 @@ async function connect() {
   let pingInterval = null;
 
   socket.onopen = () => {
-    console.log("Connected to realtime server as", myEmail);
+    console.log("Connected to realtime server");
     isConnecting = false;
+    reconnectAttempts = 0;
     broadcastStatus("connected");
 
     // keep traffic flowing so proxies (Render/Cloudflare) don't treat the
@@ -74,8 +76,13 @@ async function connect() {
   };
 
   socket.onmessage = (event) => {
-    console.log("Received lead:", event.data);
-    const lead = JSON.parse(event.data);
+    let lead;
+    try {
+      lead = JSON.parse(event.data);
+    } catch (e) {
+      console.error("Ignoring unparseable message:", e.message);
+      return;
+    }
 
     const leadUrl = `https://crm.zoho.com/crm/EntityInfo.do?module=Leads&id=${lead.leadId}`;
 
@@ -107,7 +114,6 @@ async function connect() {
   };
 
   socket.onclose = () => {
-    console.log("WebSocket disconnected, retrying in 5s");
     isConnecting = false;
     if (pingInterval) {
       clearInterval(pingInterval);
@@ -119,24 +125,46 @@ async function connect() {
 
 function scheduleReconnect() {
   clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(connect, 5000);
+
+  // Every recruiter drops at once when the server redeploys, so a fixed delay
+  // would stampede a booting instance. Back off, and jitter so they spread out.
+  const backoff = Math.min(1000 * 2 ** reconnectAttempts, 60000);
+  const delay = backoff / 2 + Math.random() * (backoff / 2);
+  reconnectAttempts++;
+
+  console.log("WebSocket disconnected, retrying in", Math.round(delay / 1000) + "s");
+  reconnectTimer = setTimeout(connect, delay);
 }
 
-async function createOffscreen() {
-  const exists = await chrome.offscreen.hasDocument?.();
+// Two leads arriving together would otherwise both see "no document" and race,
+// and the second createDocument throws.
+let offscreenReady = null;
 
-  if (!exists) {
-    await chrome.offscreen.createDocument({
-      url: "offscreen.html",
-      reasons: ["AUDIO_PLAYBACK"],
-      justification: "Play notification sound"
+function createOffscreen() {
+  if (!offscreenReady) {
+    offscreenReady = (async () => {
+      if (!(await chrome.offscreen.hasDocument?.())) {
+        await chrome.offscreen.createDocument({
+          url: "offscreen.html",
+          reasons: ["AUDIO_PLAYBACK"],
+          justification: "Play notification sound"
+        });
+      }
+    })().catch(e => {
+      offscreenReady = null;
+      throw e;
     });
   }
+  return offscreenReady;
 }
 
 async function playSound() {
-  await createOffscreen();
-  chrome.runtime.sendMessage({ type: "PLAY_SOUND" });
+  try {
+    await createOffscreen();
+    chrome.runtime.sendMessage({ type: "PLAY_SOUND" });
+  } catch (e) {
+    console.error("Could not play alert sound:", e.message);
+  }
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -144,7 +172,7 @@ chrome.runtime.onInstalled.addListener(() => {
     type: "basic",
     iconUrl: "icon.png",
     title: "CDL Notifier",
-    message: "Installed successfully. Set your email in extension options."
+    message: "Installed. Click the toolbar icon and paste your access code."
   });
 
   playSound();
@@ -163,7 +191,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === "EMAIL_UPDATED") {
+  if (msg.type === "CONFIG_UPDATED") {
     if (socket) {
       socket.close();
     }
@@ -181,6 +209,11 @@ chrome.notifications.onClicked.addListener((notificationId) => {
     if (url) {
       chrome.tabs.create({ url });
     }
+
+    // the stored url has served its purpose; without this every lead leaves a
+    // permanent entry alongside the real settings
+    chrome.storage.local.remove(notificationId);
+    chrome.notifications.clear(notificationId);
   });
 });
 

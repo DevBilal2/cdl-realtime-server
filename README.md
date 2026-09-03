@@ -17,22 +17,42 @@ npm install
 npm start
 ```
 
-Listens on `$PORT` (defaults to `3000`).
+Listens on `$PORT` (defaults to `3000`). Requires two environment variables and refuses to start without them, so a missing variable is a loud failure rather than a silently open server:
+
+- `LEAD_API_KEY` — shared secret Zoho sends as `X-API-Key`.
+- `TOKEN_SECRET` — used to derive each recruiter's access code from their email.
+
+The recruiter roster is not configured here. Zoho pushes its active-user list to
+`POST /roster` on a schedule and that is the only source of truth, so nobody has
+a second list to keep in sync. The roster lives in memory: after a restart no one
+can connect until the next push.
+
+Run `node test-smoke.js` to check auth, validation and per-recruiter routing.
+
+The free Render instance spins down after 15 minutes without inbound traffic, which drops every socket. An uptime monitor hitting `GET /` every 5 minutes keeps it up; note that running 24/7 uses roughly 730 of the 750 free instance hours per month, so keep other free services in the workspace suspended.
 
 ### Endpoints
 
-- `GET /` — health check.
-- `POST /lead` — accepts JSON (or a JSON string body) with `name`/`Full_Name`, `campus`/`Campus`, `owner`, `leadId`. Normalizes and forwards it only to the WebSocket client(s) registered under that `owner` email.
+- `GET /` — health check, unauthenticated (Render + uptime monitor). Returns `{status, connected}`.
+- `POST /lead` — requires `X-API-Key` matching `LEAD_API_KEY`. Accepts JSON with `name`/`Full_Name`, `campus`/`Campus`, `owner`, `leadId`. `owner` and `leadId` are required; anything missing them is a 400 rather than a silent no-op. Returns `{status, delivered}` so the caller can see when a lead reached nobody.
 
 ### WebSocket
 
-Clients connect to `wss://<host>?email=<recruiter-email>`. Connections without an `email` query param are rejected. A recruiter can have multiple sockets open at once (e.g. multiple browser windows); all of them receive matching leads.
+Clients connect to `wss://<host>?token=<access-code>`. The server looks the token up in `RECRUITER_TOKENS` and derives the email itself, so a client cannot claim an address it wasn't issued, and a mistyped code fails immediately instead of connecting as an address that never receives anything. Unknown or missing tokens are rejected during the HTTP upgrade. A recruiter can have multiple sockets open at once; all of them receive matching leads.
+
+Generate codes with:
+
+```
+node make-tokens.js sarah@cdl-cda.com greg@cdl-cda.com
+```
+
+stdout is the `RECRUITER_TOKENS` value; stderr is the per-person list to hand out.
 
 ## Extension (`cdl-notifier/`)
 
 Manifest V3 Chrome extension.
 
-- Click the toolbar icon to open the popup and set your Zoho email — this is what the server matches incoming leads against, and is saved in `chrome.storage.local`.
+- Click the toolbar icon to open the popup and paste your access code, saved in `chrome.storage.local`. The server maps the code to your Zoho email; there is nothing to type by hand and no way to mistype an address.
 - `background.js` maintains the WebSocket connection to the server (auto-reconnects on disconnect, plus a `chrome.alarms`-based health check as a fallback).
 - On a matching lead: shows a Chrome notification with the lead's name/campus, plays `alert.mp3` via an offscreen document, and stores a Zoho CRM deep link so clicking the notification opens that lead.
 
@@ -40,7 +60,7 @@ Manifest V3 Chrome extension.
 
 1. `chrome://extensions` → enable **Developer mode**
 2. **Load unpacked** → select the `cdl-notifier` folder
-3. Click the extension icon and set your email
+3. Click the extension icon and paste your access code
 
 ## Zoho side
 
