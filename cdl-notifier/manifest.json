@@ -1,24 +1,25 @@
 {
-    "manifest_version": 3,
-    "name": "CDL Lead Notifier",
-    "version": "1.0",
-    "permissions": [
-      "notifications",
-      "alarms",
-      "offscreen",
-      "storage",
-      "tabs"
-    ],
-    "background": {
-      "service_worker": "background.js"
-    },
-    "action": {
-      "default_popup": "options.html",
-      "default_icon": "icon.png"
-    },
-    "host_permissions": [
-      "https://*.onrender.com/*",
-      "https://crm.zoho.com/*",
-      "http://localhost:3000/*"
-    ]
-  }
+  "manifest_version": 3,
+  "name": "CDL Lead Notifier",
+  "version": "1.1.0",
+  "description": "Desktop notification the moment a lead is assigned to you in Zoho CRM.",
+  "permissions": [
+    "notifications",
+    "alarms",
+    "offscreen",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "options.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "128": "icon.png"
+  },
+  "host_permissions": [
+    "https://cdl-realtime-server-vuw5.onrender.com/*"
+  ]
+}

@@ -24,22 +24,41 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", connected: clientsByEmail.size });
 });
 
+// token -> email. The client presents a token and the server decides which
+// address it maps to, so a recruiter can't read someone else's leads by
+// typing their address, and a typo fails immediately instead of silently
+// connecting as an address that never receives anything.
+const RECRUITER_TOKENS = JSON.parse(process.env.RECRUITER_TOKENS || "{}");
+if (Object.keys(RECRUITER_TOKENS).length === 0) {
+  console.error("RECRUITER_TOKENS is not set, refusing to start");
+  process.exit(1);
+}
+
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
 
 // email -> Set<ws>, supports multiple tabs/windows per recruiter
 const clientsByEmail = new Map();
 
-wss.on("connection", (ws, req) => {
+// Authenticate during the upgrade so an unauthorized client never completes
+// the handshake.
+server.on("upgrade", (req, socket, head) => {
   const { searchParams } = new URL(req.url, "http://localhost");
-  const email = (searchParams.get("email") || "").toLowerCase().trim();
+  const email = (RECRUITER_TOKENS[searchParams.get("token")] || "").toLowerCase().trim();
 
   if (!email) {
-    console.log("Client connected without email, closing");
-    ws.close();
+    console.log("Rejected websocket upgrade: bad or missing token");
+    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    socket.destroy();
     return;
   }
 
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit("connection", ws, req, email);
+  });
+});
+
+wss.on("connection", (ws, req, email) => {
   const connectedAt = Date.now();
   console.log("Client connected:", email);
 
@@ -48,8 +67,12 @@ wss.on("connection", (ws, req) => {
   }
   clientsByEmail.get(email).add(ws);
 
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
   ws.on("message", () => {
-    // client-side keepalive pings, nothing to do
+    // client-side keepalive pings, nothing to do beyond proving liveness
+    ws.isAlive = true;
   });
 
   ws.on("close", () => {
@@ -63,6 +86,21 @@ wss.on("connection", (ws, req) => {
     }
   });
 });
+
+// A socket can die without ever firing "close" (laptop lid, dropped network),
+// leaving a dead entry that makes `delivered` count leads nobody received.
+// Ping every 30s and drop anything that missed the previous round.
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
+wss.on("close", () => clearInterval(heartbeat));
 
 app.post("/lead", (req, res) => {
   if (!safeEqual(req.get("x-api-key") || "", LEAD_API_KEY)) {

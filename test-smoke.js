@@ -6,6 +6,7 @@ import WebSocket from "ws";
 
 const PORT = 3998;
 const KEY = "test-key-do-not-use-in-prod";
+const TOKENS = { "tok-sarah": "sarah@b.com", "tok-greg": "greg@b.com" };
 const BASE = `http://localhost:${PORT}`;
 
 const post = (body, key) =>
@@ -16,7 +17,7 @@ const post = (body, key) =>
   });
 
 const srv = spawn(process.execPath, ["server.js"], {
-  env: { ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY },
+  env: { ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY, RECRUITER_TOKENS: JSON.stringify(TOKENS) },
   stdio: "inherit"
 });
 
@@ -42,7 +43,7 @@ try {
     { status: "ok", delivered: 0 }, "undelivered must report delivered:0");
 
   // connected recruiter receives only their own lead
-  const ws = new WebSocket(`ws://localhost:${PORT}?email=Sarah@B.com`);
+  const ws = new WebSocket(`ws://localhost:${PORT}?token=tok-sarah`);
   const got = new Promise(r => ws.on("message", d => r(JSON.parse(d))));
   await new Promise(r => ws.on("open", r));
 
@@ -58,6 +59,29 @@ try {
   assert.equal(msg.name, "Bob");
 
   ws.close();
+
+  // a token maps to its own address, and the client never gets to pick one
+  const open = (qs) => new Promise((res, rej) => {
+    const s = new WebSocket(`ws://localhost:${PORT}?${qs}`);
+    s.on("open", () => res(s));
+    s.on("error", rej);
+  });
+
+  await assert.rejects(open("token=not-a-real-token"), "unknown token must be rejected");
+  await assert.rejects(open(""), "no token must be rejected");
+
+  const tokenWs = await open("token=tok-greg");
+  const gotGreg = new Promise(r => tokenWs.on("message", d => r(JSON.parse(d))));
+
+  // greg's token must not pick up sarah's lead
+  const sarahLead = await (await post({ owner: "sarah@b.com", leadId: "8" }, KEY)).json();
+  assert.equal(sarahLead.delivered, 0, "token for greg must not receive sarah's lead");
+
+  const gregLead = await (await post({ owner: "greg@b.com", leadId: "8" }, KEY)).json();
+  assert.equal(gregLead.delivered, 1, "greg's token must receive greg's lead");
+  assert.equal((await gotGreg).owner, "greg@b.com");
+
+  tokenWs.close();
   console.log("\nall smoke checks passed");
 } finally {
   srv.kill();

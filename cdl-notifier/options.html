@@ -3,11 +3,6 @@
   <head>
     <meta charset="utf-8" />
     <title>CDL Lead Notifier Settings</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
     <style>
       * {
         box-sizing: border-box;
@@ -15,7 +10,7 @@
       body {
         margin: 0;
         width: 360px;
-        font-family: "IBM Plex Sans", sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         color: oklch(0.22 0.015 70);
       }
 
@@ -55,13 +50,13 @@
         min-width: 0;
       }
       .brand .cdl {
-        font-size: 15px;
+        font-size: 17px;
         font-weight: 700;
         letter-spacing: 0.01em;
         white-space: nowrap;
       }
       .brand .sub {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 500;
         color: oklch(0.4 0.02 70);
         white-space: nowrap;
@@ -117,7 +112,7 @@
         border: 1.5px solid oklch(0.78 0.015 70);
         background: white;
         font-size: 13.5px;
-        font-family: "IBM Plex Sans", sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         color: oklch(0.22 0.015 70);
         outline: none;
         transition: border-color 0.1s, box-shadow 0.1s;
@@ -177,7 +172,7 @@
         border: 1.5px solid oklch(0.78 0.015 70);
         background: oklch(0.98 0.008 70);
         font-size: 11.5px;
-        font-family: "IBM Plex Mono", monospace;
+        font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, monospace;
         color: oklch(0.35 0.015 70);
         outline: none;
         transition: border-color 0.1s, box-shadow 0.1s;
@@ -199,7 +194,7 @@
         border-radius: 4px;
         background: #e42527;
         color: white;
-        font-family: "IBM Plex Sans", sans-serif;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         font-size: 13.5px;
         font-weight: 700;
         cursor: pointer;
@@ -282,12 +277,13 @@
 
     <div class="body">
       <div class="desc">
-        One-time setup. Leads route to you by this email, no live feed here, just the notification when one lands.
+        One-time setup. Paste the access code you were sent and leads assigned to you land here as
+        desktop notifications. No live feed, just the alert when one arrives.
       </div>
 
       <div class="field">
-        <label for="email">Your Zoho CRM email</label>
-        <input type="text" id="email" placeholder="you@cdl-cda.com" />
+        <label for="token">Your access code</label>
+        <input type="text" id="token" placeholder="Paste the code you were sent" />
       </div>
 
       <div>

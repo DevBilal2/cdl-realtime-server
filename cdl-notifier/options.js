@@ -1,6 +1,6 @@
 const DEFAULT_SERVER_URL = "wss://cdl-realtime-server-vuw5.onrender.com";
 
-const emailInput = document.getElementById("email");
+const tokenInput = document.getElementById("token");
 const serverUrlInput = document.getElementById("serverUrl");
 const advancedToggle = document.getElementById("advancedToggle");
 const advancedBody = document.getElementById("advancedBody");
@@ -42,9 +42,9 @@ advancedToggle.addEventListener("click", () => {
   advancedToggle.classList.toggle("open", isOpen);
 });
 
-chrome.storage.local.get(["myEmail", "serverUrl"], ({ myEmail, serverUrl }) => {
-  if (myEmail) {
-    emailInput.value = myEmail;
+chrome.storage.local.get(["myToken", "serverUrl"], ({ myToken, serverUrl }) => {
+  if (myToken) {
+    tokenInput.value = myToken;
   }
   serverUrlInput.value = serverUrl || DEFAULT_SERVER_URL;
 });
@@ -62,11 +62,11 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 saveBtn.addEventListener("click", () => {
-  const email = emailInput.value.trim().toLowerCase();
+  const token = tokenInput.value.trim();
   const serverUrl = serverUrlInput.value.trim();
 
-  if (!email || !email.includes("@")) {
-    showStatus("error", "Enter a valid email address.");
+  if (!token) {
+    showStatus("error", "Paste your access code.");
     return;
   }
 
@@ -75,9 +75,9 @@ saveBtn.addEventListener("click", () => {
     return;
   }
 
-  chrome.storage.local.set({ myEmail: email, serverUrl }, () => {
+  chrome.storage.local.set({ myToken: token, serverUrl }, () => {
     showStatus("success", "Saved");
     setConnectionState("connecting");
-    chrome.runtime.sendMessage({ type: "EMAIL_UPDATED" });
+    chrome.runtime.sendMessage({ type: "CONFIG_UPDATED" });
   });
 });
