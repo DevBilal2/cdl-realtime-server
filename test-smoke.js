@@ -22,7 +22,7 @@ const post = (body, key) =>
   });
 
 const srv = spawn(process.execPath, ["server.js"], {
-  env: { ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY, TOKEN_SECRET: SECRET, RECRUITERS: "sarah@b.com, greg@b.com" },
+  env: { ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY, TOKEN_SECRET: SECRET },
   stdio: "inherit"
 });
 
@@ -46,6 +46,20 @@ try {
   // nobody connected -> delivered 0, and the caller is told
   assert.deepEqual(await (await post({ owner: "a@b.com", leadId: "1" }, KEY)).json(),
     { status: "ok", delivered: 0 }, "undelivered must report delivered:0");
+
+  // roster starts empty and only ever comes from Zoho
+  await assert.rejects(
+    new Promise((res, rej) => {
+      const s0 = new WebSocket(`ws://localhost:${PORT}?token=${SARAH}`);
+      s0.on("open", () => res(s0));
+      s0.on("error", rej);
+    }), "nobody connects before Zoho pushes the roster");
+
+  await fetch(`${BASE}/roster`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": KEY },
+    body: JSON.stringify({ emails: ["sarah@b.com", "greg@b.com"] })
+  });
 
   // connected recruiter receives only their own lead
   const ws = new WebSocket(`ws://localhost:${PORT}?token=${SARAH}`);

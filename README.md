@@ -20,7 +20,12 @@ npm start
 Listens on `$PORT` (defaults to `3000`). Requires two environment variables and refuses to start without them, so a missing variable is a loud failure rather than a silently open server:
 
 - `LEAD_API_KEY` — shared secret Zoho sends as `X-API-Key`.
-- `RECRUITER_TOKENS` — JSON object mapping access code to recruiter email.
+- `TOKEN_SECRET` — used to derive each recruiter's access code from their email.
+
+The recruiter roster is not configured here. Zoho pushes its active-user list to
+`POST /roster` on a schedule and that is the only source of truth, so nobody has
+a second list to keep in sync. The roster lives in memory: after a restart no one
+can connect until the next push.
 
 Run `node test-smoke.js` to check auth, validation and per-recruiter routing.
 

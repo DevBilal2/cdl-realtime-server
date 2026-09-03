@@ -79,26 +79,16 @@ function setRoster(emails) {
   return { count: Object.keys(map).length, skipped };
 }
 
-// Split on commas, semicolons or whitespace so the list survives however it
-// gets pasted in. This is only a fallback for the window between a restart and
-// Zoho's next roster push; Zoho is the source of truth.
-const seedEmails = (process.env.RECRUITERS || "").split(/[\s,;]+/).filter(Boolean);
-
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
 // email -> Set<ws>, supports multiple tabs/windows per recruiter
 const clientsByEmail = new Map();
 
-{
-  const { count, skipped } = setRoster(seedEmails);
-  if (count === 0) {
-    // safe but not useful: nobody can connect until Zoho pushes the roster
-    console.warn("Roster is empty at boot, waiting for Zoho to push it");
-  } else {
-    console.log("Roster seeded from RECRUITERS:", count, "recruiter(s),", skipped, "skipped");
-  }
-}
+// The roster lives only in memory and only ever comes from Zoho. Nobody can
+// connect between a restart and the next roster push, which is the price of
+// having exactly one source of truth for who is a recruiter.
+console.warn("Roster is empty at boot, waiting for Zoho to push it");
 
 // Authenticate during the upgrade so an unauthorized client never completes
 // the handshake.
