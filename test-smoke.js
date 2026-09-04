@@ -118,6 +118,12 @@ try {
 
   await assert.rejects(open(`token=${GREG}`), "greg's code must stop working once off the roster");
 
+  // the roster is readable with the api key, and never exposes the codes
+  assert.equal((await fetch(`${BASE}/roster`)).status, 401, "reading the roster needs the api key");
+  const view = await (await fetch(`${BASE}/roster`, { headers: { "X-API-Key": KEY } })).json();
+  assert.deepEqual(view, { count: 1, recruiters: ["sarah@b.com"] }, "roster read should list addresses only");
+  assert.ok(!JSON.stringify(view).includes(SARAH), "roster read must not leak access codes");
+
   console.log("\nall smoke checks passed");
 } finally {
   srv.kill();

@@ -152,6 +152,16 @@ const heartbeat = setInterval(() => {
 }, 30000);
 wss.on("close", () => clearInterval(heartbeat));
 
+// Addresses only, never the codes: the API key is a server-to-server secret and
+// should not be enough to impersonate a recruiter.
+app.get("/roster", (req, res) => {
+  if (!safeEqual(req.get("x-api-key") || "", LEAD_API_KEY)) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const recruiters = Object.values(recruiterTokens).sort();
+  res.json({ count: recruiters.length, recruiters });
+});
+
 app.post("/roster", (req, res) => {
   if (!safeEqual(req.get("x-api-key") || "", LEAD_API_KEY)) {
     console.log("Rejected /roster: bad or missing API key");
