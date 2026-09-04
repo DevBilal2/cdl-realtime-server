@@ -82,6 +82,43 @@ function setRoster(emails) {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
+// This system fails silently: a lead that reaches nobody looks exactly like a
+// quiet afternoon. Optional, but without it a broken notifier can go unnoticed
+// for weeks.
+const ALERT_WEBHOOK = process.env.ALERT_WEBHOOK;
+if (!ALERT_WEBHOOK) {
+  console.warn("ALERT_WEBHOOK is not set, undelivered leads will only appear in the logs");
+}
+
+const ALERT_COOLDOWN_MS = Number(process.env.ALERT_COOLDOWN_MS) || 5 * 60 * 1000;
+let undeliveredSinceAlert = 0;
+let lastAlertAt = 0;
+
+function alertUndelivered(leadId, owner) {
+  if (!ALERT_WEBHOOK) return;
+
+  undeliveredSinceAlert++;
+
+  // an empty roster makes every lead undelivered at once, and a hundred
+  // messages is the same as none
+  if (Date.now() - lastAlertAt < ALERT_COOLDOWN_MS) return;
+
+  const also = undeliveredSinceAlert > 1 ? ` (and ${undeliveredSinceAlert - 1} more in the last few minutes)` : "";
+  lastAlertAt = Date.now();
+  undeliveredSinceAlert = 0;
+
+  // the lead's name is customer PII and stays out of the alert, as with the logs
+  const text = `CDL Lead Notifier: lead ${leadId} for ${owner} reached nobody${also}. `
+    + `They are not connected, so no notification was shown.`;
+
+  // never let a broken webhook affect the response to Zoho
+  fetch(ALERT_WEBHOOK, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  }).catch(e => console.error("Alert webhook failed:", e.message));
+}
+
 // email -> Set<ws>, supports multiple tabs/windows per recruiter
 const clientsByEmail = new Map();
 
@@ -218,6 +255,10 @@ app.post("/lead", (req, res) => {
   // the lead's name is customer PII and stays out of the logs; owner and
   // leadId are what you need to trace whether a lead actually landed
   console.log("Lead", leadId, "->", owner, ": delivered to", delivered, "client(s)");
+
+  if (delivered === 0) {
+    alertUndelivered(leadId, owner);
+  }
 
   res.json({ status: "ok", delivered });
 });

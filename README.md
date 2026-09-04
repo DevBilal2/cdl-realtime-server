@@ -22,6 +22,16 @@ Listens on `$PORT` (defaults to `3000`). Requires two environment variables and 
 - `LEAD_API_KEY` — shared secret Zoho sends as `X-API-Key`.
 - `TOKEN_SECRET` — used to derive each recruiter's access code from their email.
 
+Optional:
+
+- `ALERT_WEBHOOK` — posted `{"text": "..."}` when a lead reaches nobody. Slack
+  incoming webhooks take this shape directly. Without it an undelivered lead is
+  only a log line, and this system's failure mode is silence: no notifications
+  looks exactly like a quiet day.
+- `ALERT_COOLDOWN_MS` — minimum gap between alerts, default 5 minutes. An empty
+  roster makes every lead undelivered at once, and the suppressed ones are
+  counted in the next message rather than sent individually.
+
 The recruiter roster is not configured here. Zoho pushes its active-user list to
 `POST /roster` on a schedule and that is the only source of truth, so nobody has
 a second list to keep in sync. The roster lives in memory: after a restart no one

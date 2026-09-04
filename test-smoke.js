@@ -4,6 +4,7 @@ import assert from "assert";
 import { spawn } from "child_process";
 import crypto from "crypto";
 import WebSocket from "ws";
+import http from "http";
 
 const PORT = 3998;
 const KEY = "test-key-do-not-use-in-prod";
@@ -21,8 +22,20 @@ const post = (body, key) =>
     body: JSON.stringify(body)
   });
 
+// stand-in for the Slack webhook, so we can prove the alert actually fires
+const alerts = [];
+const alertSrv = http.createServer((req, res) => {
+  let b = "";
+  req.on("data", c => b += c);
+  req.on("end", () => { alerts.push(JSON.parse(b)); res.end("ok"); });
+});
+await new Promise(r => alertSrv.listen(3996, r));
+
 const srv = spawn(process.execPath, ["server.js"], {
-  env: { ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY, TOKEN_SECRET: SECRET },
+  env: {
+    ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY, TOKEN_SECRET: SECRET,
+    ALERT_WEBHOOK: "http://localhost:3996/hook", ALERT_COOLDOWN_MS: "1500"
+  },
   stdio: "inherit"
 });
 
@@ -124,7 +137,28 @@ try {
   assert.deepEqual(view, { count: 1, recruiters: ["sarah@b.com"] }, "roster read should list addresses only");
   assert.ok(!JSON.stringify(view).includes(SARAH), "roster read must not leak access codes");
 
+  // an undelivered lead raises an alert, and a burst collapses into one message.
+  // wait out the cooldown that earlier undelivered leads in this test consumed
+  await new Promise(r => setTimeout(r, 1600));
+  alerts.length = 0;
+  for (let i = 0; i < 4; i++) {
+    await post({ owner: "nobody@b.com", leadId: "alert-" + i }, KEY);
+  }
+  await new Promise(r => setTimeout(r, 400));
+  assert.equal(alerts.length, 1, "a burst of undelivered leads must collapse into one alert");
+  assert.ok(alerts[0].text.includes("reached nobody"), "alert should say the lead reached nobody");
+  assert.ok(/and \d+ more/.test(alerts[0].text), "alert should count the suppressed ones");
+
+  // a delivered lead raises nothing
+  const live = await open(`token=${SARAH}`);
+  alerts.length = 0;
+  await post({ owner: "sarah@b.com", leadId: "quiet-1" }, KEY);
+  await new Promise(r => setTimeout(r, 400));
+  assert.equal(alerts.length, 0, "a delivered lead must not alert");
+  live.close();
+
   console.log("\nall smoke checks passed");
 } finally {
   srv.kill();
+  alertSrv.close();
 }
