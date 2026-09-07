@@ -64,7 +64,7 @@ stdout is the `RECRUITER_TOKENS` value; stderr is the per-person list to hand ou
 
 Manifest V3 Chrome extension.
 
-- Click the toolbar icon to open the popup and paste your access code, saved in `chrome.storage.local`. The server maps the code to your Zoho email; there is nothing to type by hand and no way to mistype an address.
+- Click the toolbar icon to open the popup and paste your access code, saved in `chrome.storage.local`. Each notification also stores its click-through link there; clicking clears it, and an hourly sweep ages out anything older than 24 hours, so a dismissed notification cannot leave an entry behind for good. The server maps the code to your Zoho email; there is nothing to type by hand and no way to mistype an address.
 - `background.js` maintains the WebSocket connection to the server (auto-reconnects on disconnect, plus a `chrome.alarms`-based health check as a fallback).
 - On a matching lead: shows a Chrome notification with the lead's name/campus, plays `alert.mp3` via an offscreen document, and stores a Zoho CRM deep link so clicking the notification opens that lead.
 

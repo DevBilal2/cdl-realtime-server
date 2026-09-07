@@ -151,18 +151,25 @@ function flushMissed(ws, email) {
   const list = missedByEmail.get(email);
   if (!list || list.length === 0) return 0;
 
-  missedByEmail.delete(email);
-
   const cutoff = Date.now() - MISSED_MAX_AGE_MS;
+  const fresh = list.filter(item => item.at >= cutoff);
   let sent = 0;
 
-  for (const { payload, at } of list) {
-    if (at < cutoff) continue;
+  for (const item of fresh) {
     if (ws.readyState !== 1) break;
     // the extension already honours whatever title it is given, so a lead from
     // three hours ago does not announce itself as new
-    ws.send(JSON.stringify({ ...payload, title: "Missed Lead" }));
+    ws.send(JSON.stringify({ ...item.payload, title: "Missed Lead" }));
     sent++;
+  }
+
+  // put back anything the socket died before reaching, so a connection
+  // dropping mid-flush cannot discard the backlog it exists to protect
+  const unsent = fresh.slice(sent);
+  if (unsent.length > 0) {
+    missedByEmail.set(email, unsent);
+  } else {
+    missedByEmail.delete(email);
   }
 
   return sent;

@@ -101,9 +101,11 @@ async function connect() {
       }
     });
 
-    // store URL for click event
+    // stored with a timestamp so it can be swept later; a notification the
+    // recruiter dismisses instead of clicking would otherwise leave its entry
+    // behind for good
     chrome.storage.local.set({
-      [lead.leadId]: leadUrl
+      [lead.leadId]: { u: leadUrl, t: Date.now() }
     });
 
     playSound();
@@ -158,7 +160,14 @@ function createOffscreen() {
   return offscreenReady;
 }
 
+// A backlog of missed leads arrives all at once. Restarting the same audio
+// element per lead is a stutter, not an alert, so a burst gets one sound.
+let lastSoundAt = 0;
+
 async function playSound() {
+  if (Date.now() - lastSoundAt < 1000) return;
+  lastSoundAt = Date.now();
+
   try {
     await createOffscreen();
     chrome.runtime.sendMessage({ type: "PLAY_SOUND" });
@@ -184,11 +193,38 @@ chrome.runtime.onStartup.addListener(connect);
 // service workers can be suspended/killed; this periodically wakes us up
 // and reconnects if the socket died without onclose firing cleanly
 chrome.alarms.create("keepalive", { periodInMinutes: 1 });
+chrome.alarms.create("sweep", { periodInMinutes: 60 });
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepalive" && (!socket || socket.readyState !== WebSocket.OPEN)) {
     connect();
   }
+  if (alarm.name === "sweep") {
+    sweepOldLinks();
+  }
 });
+
+// Clicking a notification clears its link, but a dismissed one never does.
+// Age the rest out so storage cannot grow forever. Settings have no `t`, so
+// they are never touched.
+const LINK_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function sweepOldLinks() {
+  try {
+    const all = await chrome.storage.local.get(null);
+    const cutoff = Date.now() - LINK_TTL_MS;
+    const stale = Object.entries(all)
+      .filter(([, v]) => v && typeof v === "object" && typeof v.t === "number" && v.t < cutoff)
+      .map(([k]) => k);
+
+    if (stale.length > 0) {
+      await chrome.storage.local.remove(stale);
+      console.log("Swept", stale.length, "old lead link(s)");
+    }
+  } catch (e) {
+    console.error("Could not sweep old lead links:", e.message);
+  }
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "CONFIG_UPDATED") {
@@ -204,14 +240,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 chrome.notifications.onClicked.addListener((notificationId) => {
   chrome.storage.local.get(notificationId, (result) => {
-    const url = result[notificationId];
+    const entry = result[notificationId];
 
-    if (url) {
-      chrome.tabs.create({ url });
+    if (entry && entry.u) {
+      chrome.tabs.create({ url: entry.u });
     }
 
-    // the stored url has served its purpose; without this every lead leaves a
-    // permanent entry alongside the real settings
     chrome.storage.local.remove(notificationId);
     chrome.notifications.clear(notificationId);
   });
