@@ -157,6 +157,34 @@ try {
   assert.equal(alerts.length, 0, "a delivered lead must not alert");
   live.close();
 
+  // a lead for an offline recruiter is held, then delivered when they connect
+  await roster({ emails: ["sarah@b.com", "greg@b.com"] }, KEY);
+  await new Promise(r => setTimeout(r, 200));
+
+  await post({ owner: "greg@b.com", name: "Held One", campus: "Dallas", leadId: "held-1" }, KEY);
+  await post({ owner: "greg@b.com", name: "Held Two", campus: "Dallas", leadId: "held-2" }, KEY);
+
+  const health = await (await fetch(BASE)).json();
+  assert.equal(health.held, 2, "two leads should be waiting for greg");
+
+  const back = await open(`token=${GREG}`);
+  const caught = [];
+  back.on("message", d => caught.push(JSON.parse(d)));
+  await new Promise(r => setTimeout(r, 400));
+
+  assert.equal(caught.length, 2, "both held leads should arrive on connect");
+  assert.deepEqual(caught.map(c => c.leadId), ["held-1", "held-2"], "in the order they arrived");
+  assert.equal(caught[0].title, "Missed Lead", "a held lead should not announce itself as new");
+
+  // and the backlog is cleared, not replayed on every reconnect
+  assert.equal((await (await fetch(BASE)).json()).held, 0, "backlog should be empty after flushing");
+  back.close();
+  await new Promise(r => setTimeout(r, 200));
+
+  // nothing is held for an address that is not a recruiter
+  await post({ owner: "stranger@b.com", leadId: "ignore-1" }, KEY);
+  assert.equal((await (await fetch(BASE)).json()).held, 0, "must not hold leads for non-recruiters");
+
   console.log("\nall smoke checks passed");
 } finally {
   srv.kill();

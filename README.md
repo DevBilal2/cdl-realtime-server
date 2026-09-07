@@ -43,7 +43,9 @@ The free Render instance spins down after 15 minutes without inbound traffic, wh
 
 ### Endpoints
 
-- `GET /` — health check, unauthenticated (Render + uptime monitor). Returns `{status, connected}`.
+- `GET /` — health check, unauthenticated (Render + uptime monitor). Returns
+  `{status, connected, held}`, where `held` is how many leads are waiting for
+  recruiters who are currently offline.
 - `POST /lead` — requires `X-API-Key` matching `LEAD_API_KEY`. Accepts JSON with `name`/`Full_Name`, `campus`/`Campus`, `owner`, `leadId`. `owner` and `leadId` are required; anything missing them is a 400 rather than a silent no-op. Returns `{status, delivered}` so the caller can see when a lead reached nobody.
 
 ### WebSocket
@@ -250,3 +252,20 @@ curl -H "X-API-Key: $LEAD_API_KEY" https://cdl-realtime-server-vuw5.onrender.com
 
 Addresses only. The codes are deliberately not exposed, so the API key alone is
 not enough to impersonate a recruiter.
+
+## Missed leads
+
+A lead that reaches nobody is held in memory and delivered the moment that
+recruiter next connects, arriving titled "Missed Lead" rather than announcing
+itself as new. Without this, a lead arriving while someone's laptop is shut was
+gone for good.
+
+Capped at the 20 most recent per person and 24 hours old, so somebody back from
+a week away gets their recent leads rather than a hundred popups. Nothing is
+held for an address that is not on the roster, since it could never be
+collected. Taking someone off the roster discards theirs.
+
+This is memory, so a restart loses whatever is waiting. It covers the ordinary
+gaps — a closed laptop, a lunch break, the window after a redeploy — not a
+crash. Durable recovery needs the Zoho side to track delivery per lead and
+re-push what was missed.

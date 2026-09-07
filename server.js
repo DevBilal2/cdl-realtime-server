@@ -21,7 +21,9 @@ app.use(express.json());
 
 // health check, stays unauthenticated for Render and the uptime monitor
 app.get("/", (req, res) => {
-  res.json({ status: "ok", connected: clientsByEmail.size });
+  let held = 0;
+  for (const list of missedByEmail.values()) held += list.length;
+  res.json({ status: "ok", connected: clientsByEmail.size, held });
 });
 
 // Access codes are derived from the email, so there is no code-to-person
@@ -70,6 +72,7 @@ function setRoster(emails) {
   for (const [email, sockets] of clientsByEmail) {
     if (!active.has(email)) {
       console.log("Disconnecting, no longer on roster:", email);
+      missedByEmail.delete(email);
       for (const ws of sockets) {
         ws.close(1008, "no longer on roster");
       }
@@ -122,6 +125,49 @@ function alertUndelivered(leadId, owner) {
 // email -> Set<ws>, supports multiple tabs/windows per recruiter
 const clientsByEmail = new Map();
 
+// Leads that reached nobody, kept until that recruiter next connects. Without
+// this a lead arriving while someone's laptop is shut is gone for good.
+//
+// In memory, so a restart loses whatever is waiting. That is the reason the
+// Zoho-side retry still matters: this covers the common short gaps, not a
+// crash.
+const MISSED_MAX_PER_EMAIL = 20;
+const MISSED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const missedByEmail = new Map();
+
+function holdForLater(email, payload) {
+  const list = missedByEmail.get(email) || [];
+  list.push({ payload, at: Date.now() });
+
+  // someone back from a week away should get their recent leads, not a
+  // hundred popups at once
+  if (list.length > MISSED_MAX_PER_EMAIL) {
+    list.splice(0, list.length - MISSED_MAX_PER_EMAIL);
+  }
+  missedByEmail.set(email, list);
+}
+
+function flushMissed(ws, email) {
+  const list = missedByEmail.get(email);
+  if (!list || list.length === 0) return 0;
+
+  missedByEmail.delete(email);
+
+  const cutoff = Date.now() - MISSED_MAX_AGE_MS;
+  let sent = 0;
+
+  for (const { payload, at } of list) {
+    if (at < cutoff) continue;
+    if (ws.readyState !== 1) break;
+    // the extension already honours whatever title it is given, so a lead from
+    // three hours ago does not announce itself as new
+    ws.send(JSON.stringify({ ...payload, title: "Missed Lead" }));
+    sent++;
+  }
+
+  return sent;
+}
+
 // The roster lives only in memory and only ever comes from Zoho. Nobody can
 // connect between a restart and the next roster push, which is the price of
 // having exactly one source of truth for who is a recruiter.
@@ -153,6 +199,11 @@ wss.on("connection", (ws, req, email) => {
     clientsByEmail.set(email, new Set());
   }
   clientsByEmail.get(email).add(ws);
+
+  const caughtUp = flushMissed(ws, email);
+  if (caughtUp > 0) {
+    console.log("Sent", caughtUp, "missed lead(s) to", email);
+  }
 
   ws.isAlive = true;
   ws.on("pong", () => { ws.isAlive = true; });
@@ -257,6 +308,10 @@ app.post("/lead", (req, res) => {
   console.log("Lead", leadId, "->", owner, ": delivered to", delivered, "client(s)");
 
   if (delivered === 0) {
+    // no point holding leads for an address that can never connect
+    if (Object.values(recruiterTokens).includes(owner)) {
+      holdForLater(owner, payload);
+    }
     alertUndelivered(leadId, owner);
   }
 
