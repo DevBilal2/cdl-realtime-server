@@ -155,7 +155,7 @@ if(ownerEmail != null && ownerEmail != "")
 
 	response = invokeurl
 	[
-		url :"https://cdl-realtime-server-vuw5.onrender.com/lead"
+		url :"https://cdl-realtime-server-orbw.onrender.com/lead"
 		type :POST
 		parameters: payload.toString()
 		headers: headers
@@ -203,7 +203,7 @@ if(emails.size() > 0)
 
 	response = invokeurl
 	[
-		url :"https://cdl-realtime-server-vuw5.onrender.com/roster"
+		url :"https://cdl-realtime-server-orbw.onrender.com/roster"
 		type :POST
 		parameters: payload.toString()
 		headers: headers
@@ -246,7 +246,7 @@ for each u in users.get("users")
 ## Checking the roster
 
 ```
-curl -H "X-API-Key: $LEAD_API_KEY" https://cdl-realtime-server-vuw5.onrender.com/roster
+curl -H "X-API-Key: $LEAD_API_KEY" https://cdl-realtime-server-orbw.onrender.com/roster
 {"count":11,"recruiters":["..."]}
 ```
 

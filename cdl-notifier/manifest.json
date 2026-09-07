@@ -20,6 +20,6 @@
     "128": "icon.png"
   },
   "host_permissions": [
-    "https://cdl-realtime-server-vuw5.onrender.com/*"
+    "https://cdl-realtime-server-orbw.onrender.com/*"
   ]
 }

@@ -1,4 +1,4 @@
-const DEFAULT_SERVER_URL = "wss://cdl-realtime-server-vuw5.onrender.com";
+const DEFAULT_SERVER_URL = "wss://cdl-realtime-server-orbw.onrender.com";
 
 const tokenInput = document.getElementById("token");
 const serverUrlInput = document.getElementById("serverUrl");
