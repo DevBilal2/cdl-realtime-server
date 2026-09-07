@@ -175,11 +175,14 @@ that is the only trace it leaves.
 Run this whenever someone joins or leaves. The roster is held in memory, so it
 must also be re-run after any server restart or nobody can connect.
 
+Note `users.get("users")`: `getRecords("users", ...)` returns a map keyed
+`users`, not a bare list, so iterating the response directly finds nothing.
+
 ```
 users = zoho.crm.getRecords("users", 1, 200, {"type":"ActiveUsers"});
 
 emails = List();
-for each u in users
+for each u in users.get("users")
 {
 	e = u.get("email");
 	if(e != null && e != "")
@@ -218,11 +221,16 @@ Prints every active recruiter with their access code, for onboarding. Whoever
 can run this can impersonate anyone, so it belongs behind a permissioned button
 rather than general function-edit rights.
 
+Keep it separate from the roster sync. Merged into the scheduled function, it
+would write every recruiter's access code into the Zoho function log on every
+run, turning a credential into log output that outlives the reason for printing
+it.
+
 ```
 secret = zoho.crm.getOrgVariable("cdl_notifier_token_secret");
 users = zoho.crm.getRecords("users", 1, 200, {"type":"ActiveUsers"});
 
-for each u in users
+for each u in users.get("users")
 {
 	e = u.get("email");
 	if(e != null && e != "")
