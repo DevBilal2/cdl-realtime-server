@@ -45,11 +45,29 @@ function codeFor(email) {
     .slice(0, 24);
 }
 
+// A Chrome Web Store reviewer needs a code that connects, but must not be
+// handed a recruiter's: they would receive that person's real leads, meaning
+// customer names going to a stranger. This address is owned by nobody in Zoho,
+// so it connects and then receives nothing, which is exactly what a reviewer
+// needs to see. It sits outside the roster so the two-hourly sync cannot wipe
+// it. Unset it once the review is done.
+const REVIEW_TOKEN = process.env.REVIEW_TOKEN;
+const REVIEW_EMAIL = "chrome-review@invalid.local";
+if (REVIEW_TOKEN) {
+  console.warn("REVIEW_TOKEN is set, a store reviewer can connect as", REVIEW_EMAIL);
+}
+
 // token -> email. The client presents a code and the server decides which
 // address it maps to, so a recruiter can't read someone else's leads by
 // claiming their address, and a mistyped code fails immediately instead of
 // connecting as an address that never receives anything.
 let recruiterTokens = {};
+
+function emailForToken(token) {
+  if (!token) return "";
+  if (REVIEW_TOKEN && safeEqual(token, REVIEW_TOKEN)) return REVIEW_EMAIL;
+  return recruiterTokens[token] || "";
+}
 
 function setRoster(emails) {
   const map = {};
@@ -184,7 +202,7 @@ console.warn("Roster is empty at boot, waiting for Zoho to push it");
 // the handshake.
 server.on("upgrade", (req, socket, head) => {
   const { searchParams } = new URL(req.url, "http://localhost");
-  const email = (recruiterTokens[searchParams.get("token")] || "").toLowerCase().trim();
+  const email = emailForToken(searchParams.get("token")).toLowerCase().trim();
 
   if (!email) {
     console.log("Rejected websocket upgrade: bad or missing token");
@@ -316,7 +334,7 @@ app.post("/lead", (req, res) => {
 
   if (delivered === 0) {
     // no point holding leads for an address that can never connect
-    if (Object.values(recruiterTokens).includes(owner)) {
+    if (owner !== REVIEW_EMAIL && Object.values(recruiterTokens).includes(owner)) {
       holdForLater(owner, payload);
     }
     alertUndelivered(leadId, owner);

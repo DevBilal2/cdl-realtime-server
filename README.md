@@ -19,18 +19,23 @@ npm start
 
 Listens on `$PORT` (defaults to `3000`). Requires two environment variables and refuses to start without them, so a missing variable is a loud failure rather than a silently open server:
 
-- `LEAD_API_KEY` — shared secret Zoho sends as `X-API-Key`.
-- `TOKEN_SECRET` — used to derive each recruiter's access code from their email.
+- `LEAD_API_KEY`: shared secret Zoho sends as `X-API-Key`.
+- `TOKEN_SECRET`: used to derive each recruiter's access code from their email.
 
 Optional:
 
-- `ALERT_WEBHOOK` — posted `{"text": "..."}` when a lead reaches nobody. Slack
+- `ALERT_WEBHOOK`: posted `{"text": "..."}` when a lead reaches nobody. Slack
   incoming webhooks take this shape directly. Without it an undelivered lead is
   only a log line, and this system's failure mode is silence: no notifications
   looks exactly like a quiet day.
-- `ALERT_COOLDOWN_MS` — minimum gap between alerts, default 5 minutes. An empty
+- `ALERT_COOLDOWN_MS`: minimum gap between alerts, default 5 minutes. An empty
   roster makes every lead undelivered at once, and the suppressed ones are
   counted in the next message rather than sent individually.
+- `REVIEW_TOKEN`: a single code that connects as `chrome-review@invalid.local`,
+  for a Chrome Web Store reviewer. That address is on nobody's Zoho account, so
+  it connects and then receives nothing. Handing a reviewer a real recruiter's
+  code instead would send them that person's actual leads. It sits outside the
+  roster so the two-hourly sync cannot remove it. Unset it once review is done.
 
 The recruiter roster is not configured here. Zoho pushes its active-user list to
 `POST /roster` on a schedule and that is the only source of truth, so nobody has

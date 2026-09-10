@@ -34,7 +34,7 @@ await new Promise(r => alertSrv.listen(3996, r));
 const srv = spawn(process.execPath, ["server.js"], {
   env: {
     ...process.env, PORT: String(PORT), LEAD_API_KEY: KEY, TOKEN_SECRET: SECRET,
-    ALERT_WEBHOOK: "http://localhost:3996/hook", ALERT_COOLDOWN_MS: "1500"
+    ALERT_WEBHOOK: "http://localhost:3996/hook", ALERT_COOLDOWN_MS: "1500", REVIEW_TOKEN: "review-token-for-tests"
   },
   stdio: "inherit"
 });
