@@ -1,6 +1,6 @@
 # cdl-realtime-server
 
-Real-time lead notification system for CDL recruiters. When a lead is created/assigned in Zoho CRM, its owning recruiter gets a desktop notification with a click-through link to the lead — no polling, no refreshing Zoho.
+Real-time lead notification system for CDL recruiters. When a lead is created/assigned in Zoho CRM, its owning recruiter gets a desktop notification with a click-through link to the lead. No polling, no refreshing Zoho.
 
 ## How it works
 
@@ -48,10 +48,10 @@ The free Render instance spins down after 15 minutes without inbound traffic, wh
 
 ### Endpoints
 
-- `GET /` — health check, unauthenticated (Render + uptime monitor). Returns
+- `GET /`: health check, unauthenticated (Render + uptime monitor). Returns
   `{status, connected, held}`, where `held` is how many leads are waiting for
   recruiters who are currently offline.
-- `POST /lead` — requires `X-API-Key` matching `LEAD_API_KEY`. Accepts JSON with `name`/`Full_Name`, `campus`/`Campus`, `owner`, `leadId`. `owner` and `leadId` are required; anything missing them is a 400 rather than a silent no-op. Returns `{status, delivered}` so the caller can see when a lead reached nobody.
+- `POST /lead`: requires `X-API-Key` matching `LEAD_API_KEY`. Accepts JSON with `name`/`Full_Name`, `campus`/`Campus`, `owner`, `leadId`. `owner` and `leadId` are required; anything missing them is a 400 rather than a silent no-op. Returns `{status, delivered}` so the caller can see when a lead reached nobody.
 
 ### WebSocket
 
@@ -87,7 +87,7 @@ The Deluge function that triggers `/lead` must send the lead's real owner email,
 payload.put("owner", lead.get("Owner").get("email"));
 ```
 
-Not a hardcoded test value — the server matches on this exact email against what each recruiter set in their extension popup.
+Not a hardcoded test value. The server matches on this exact email against what each recruiter set in their extension popup.
 
 ## Access codes
 
@@ -271,6 +271,6 @@ held for an address that is not on the roster, since it could never be
 collected. Taking someone off the roster discards theirs.
 
 This is memory, so a restart loses whatever is waiting. It covers the ordinary
-gaps — a closed laptop, a lunch break, the window after a redeploy — not a
+gaps (a closed laptop, a lunch break, the window after a redeploy), not a
 crash. Durable recovery needs the Zoho side to track delivery per lead and
 re-push what was missed.
